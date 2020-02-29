@@ -20,28 +20,20 @@ namespace PfSenseFauxApi.Net
     {
         #region Key/Secret
 
-        // Alphanumeric, 12-40 chars, start with PFFA, not be PFFAexample01 or PFFAexample02.
-        private static readonly Regex ValidKey = new Regex(@"^PFFA(?!example0[12])[A-Za-z0-9]{8,36}$");
+        /// <summary>
+        /// Alphanumeric, 12-40 chars, start with PFFA, not be PFFAexample01 or PFFAexample02.
+        /// </summary>
+        public static readonly Regex ValidKey = new Regex(@"^PFFA(?!example0[12])[A-Za-z0-9]{8,36}$");
 
-        // Alphanumeric, 40-128 chars.
-        private static readonly Regex ValidSecret = new Regex(@"^[A-Za-z0-9]{40,128}$");
+        /// <summary>
+        /// Alphanumeric, 40-128 chars.
+        /// </summary>
+        public static readonly Regex ValidSecret = new Regex(@"^[A-Za-z0-9]{40,128}$");
 
         private static readonly char[] AlphaNum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".ToCharArray();
 
         private static readonly RandomNumberGenerator RNG = RandomNumberGenerator.Create();
         private static readonly SHA256                SHA = SHA256.Create();
-
-        private static string GenerateNonce()
-        {
-            var data = new byte[4];
-            lock (RNG)
-            {
-                RNG.GetBytes(data);
-            }
-
-            var l = BitConverter.ToUInt32(data);
-            return l.ToString("x8");
-        }
 
         /// <summary>
         /// Generates a key/secret pair.
@@ -128,9 +120,21 @@ namespace PfSenseFauxApi.Net
 
         #region Internals
 
+        private static string GenerateNonce()
+        {
+            var data = new byte[4];
+            lock (RNG)
+            {
+                RNG.GetBytes(data);
+            }
+
+            var l = BitConverter.ToUInt32(data);
+            return l.ToString("x8");
+        }
+
         private string GenerateAuth()
         {
-            var dt         = DateTime.Now.ToUniversalTime().ToString("yyyyMMdd'Z'HHMMss");
+            var dt         = DateTime.Now.ToUniversalTime().ToString("yyyyMMdd'Z'HHmmss");
             var nonce      = GenerateNonce();
             var data       = Encoding.ASCII.GetBytes($"{ApiSecret}{dt}{nonce}");
             var hashBytes  = SHA.ComputeHash(data);
@@ -161,8 +165,9 @@ namespace PfSenseFauxApi.Net
                 url += "&" + string.Join(
                            "&",
                            args.Where(x => !ReferenceEquals(null, x.Item2) && !string.IsNullOrEmpty(x.Item1))
-                               .Select(x => HttpUtility.UrlEncode(x.Item1) + "=" + HttpUtility.UrlEncode(x.Item2)));
-                url =  url.TrimEnd('&');
+                               .Select(x => HttpUtility.UrlEncode(x.Item1) + "=" + HttpUtility.UrlEncode(x.Item2))
+                       );
+                url = url.TrimEnd('&');
             }
 
             var ret = (HttpWebRequest) WebRequest.Create(url);
@@ -267,7 +272,7 @@ namespace PfSenseFauxApi.Net
         /// <returns></returns>
         public async Task<ConfigBackupResponse> ConfigBackupAsync()
             => await StandardCall<ConfigBackupResponse>("config_backup");
-        
+
         /// <summary>
         ///  Causes the system to take a configuration backup and add it to the regular set of pfSense system backups at /cf/conf/backup/
         /// </summary>
@@ -297,7 +302,9 @@ namespace PfSenseFauxApi.Net
         /// <exception cref="ApiException"></exception>
         /// <exception cref="ApiMessageException"></exception>
         /// <exception cref="ApiJsonException"></exception>
-        public async Task<JsonElement> ConfigGetAsync(string configFile = null)
+        public async Task<ConfigGetResponse> ConfigGetAsync(string configFile = null)
+            => await StandardCall<ConfigGetResponse>("config_get", args: new[] {("config_file", config_file: configFile)});
+        /*public async Task<JsonElement> ConfigGetAsync(string configFile = null)
         {
             var responseBody = await Execute("config_get", args: new []{("config_file", configFile)});
 
@@ -329,7 +336,7 @@ namespace PfSenseFauxApi.Net
             {
                 throw new ApiJsonException(responseBody, e);
             }
-        }
+        }*/
 
         /// <summary>
         /// Returns the system configuration as a JSON formatted string. Additionally, using the optional config_file parameter it is possible to retrieve backup configurations by providing the full path to it under the /cf/conf/backup path.
@@ -339,7 +346,7 @@ namespace PfSenseFauxApi.Net
         /// <exception cref="ApiException"></exception>
         /// <exception cref="ApiMessageException"></exception>
         /// <exception cref="ApiJsonException"></exception>
-        public JsonElement ConfigGet(string configFile = null) 
+        public ConfigGetResponse ConfigGet(string configFile = null)
             => ConfigGetAsync(configFile).Result;
 
         /// <summary>
@@ -393,7 +400,7 @@ namespace PfSenseFauxApi.Net
         /// <returns></returns>
         public ConfigRestoreResponse ConfigRestore(string configFile)
             => ConfigRestoreAsync(configFile).Result;
-        
+
         /// <summary>
         /// Sets a full system configuration and (by default) takes a system config backup and (by default) causes the system config to be reloaded once successfully written and tested.
         /// </summary>
@@ -433,7 +440,7 @@ namespace PfSenseFauxApi.Net
         /// </summary>
         /// <param name="interfaceName"></param>
         /// <returns></returns>
-        public async Task<InterfaceStatsResponse> InterfaceStatsAsync(string interfaceName) 
+        public async Task<InterfaceStatsResponse> InterfaceStatsAsync(string interfaceName)
             => await StandardCall<InterfaceStatsResponse>("interface_stats", args: new[] {("interface", interfaceName)});
 
         /// <summary>
