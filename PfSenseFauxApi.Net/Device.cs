@@ -18,71 +18,6 @@ namespace PfSenseFauxApi.Net
 {
     public class Device
     {
-        #region Key/Secret
-
-        /// <summary>
-        /// Alphanumeric, 12-40 chars, start with PFFA, not be PFFAexample01 or PFFAexample02.
-        /// </summary>
-        public static readonly Regex ValidKey = new Regex(@"^PFFA(?!example0[12])[A-Za-z0-9]{8,36}$");
-
-        /// <summary>
-        /// Alphanumeric, 40-128 chars.
-        /// </summary>
-        public static readonly Regex ValidSecret = new Regex(@"^[A-Za-z0-9]{40,128}$");
-
-        private static readonly char[] AlphaNum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".ToCharArray();
-
-        private static readonly RandomNumberGenerator RNG = RandomNumberGenerator.Create();
-        private static readonly SHA256                SHA = SHA256.Create();
-
-        /// <summary>
-        /// Generates a key/secret pair.
-        /// </summary>
-        /// <returns></returns>
-        public static (string, string) GenerateKeyPair(int keyLen = 24, int secretLen = 60)
-        {
-            if (keyLen < 12 ||
-                keyLen > 40) throw new ArgumentException("Key length must be between 12 and 40 characters.");
-            if (secretLen < 40 ||
-                secretLen > 128) throw new ArgumentException("Secret length must be between 40 and 128 characters.");
-
-            keyLen -= 4;
-            var data = new byte[keyLen + secretLen];
-
-            while (true)
-            {
-                lock (RNG)
-                {
-                    RNG.GetBytes(data);
-                }
-
-                var sb = new StringBuilder("PFFA");
-                for (var i = 0; i < keyLen; i++)
-                {
-                    sb.Append(AlphaNum[data[i] % AlphaNum.Length]);
-                }
-
-                var key = sb.ToString();
-
-                sb.Clear();
-                for (var i = 0; i < secretLen; i++)
-                {
-                    var j = i + keyLen;
-                    sb.Append(AlphaNum[data[i] % AlphaNum.Length]);
-                }
-
-                var secret = sb.ToString();
-
-                // theoretically possible, but highly unlikely.
-                if (!ValidKey.IsMatch(key) ||
-                    !ValidSecret.IsMatch(secret)) continue;
-
-                return (key, secret);
-            }
-        }
-
-        #endregion
-
         /// <summary>
         /// Path to the fauxapi.
         /// </summary>
@@ -91,56 +26,22 @@ namespace PfSenseFauxApi.Net
         /// <summary>
         /// The key used for the API.
         /// </summary>
-        public string ApiKey { get; }
-
-        /// <summary>
-        /// The secret used to authenticate the API.
-        /// </summary>
-        public string ApiSecret { get; }
+        public AuthorizationKey AuthorizationKey { get; }
 
         /// <summary>
         /// Determines if the device certificate should be verified.
         /// </summary>
         public bool VerifySslCert { get; }
 
-        public Device(string path, string key, string secret, bool verifySslCert)
+        public Device(string path, AuthorizationKey key, bool verifySslCert)
         {
             Path = path ?? throw new ArgumentNullException(nameof(path));
             if (string.IsNullOrEmpty(Path)) throw new ArgumentException("Path cannot be blank.");
-            ApiKey = key ?? throw new ArgumentNullException(nameof(key));
-            if (string.IsNullOrEmpty(ApiKey)) throw new ArgumentException("ApiKey cannot be blank.");
-            ApiSecret = secret ?? throw new ArgumentException(nameof(secret));
-            if (string.IsNullOrEmpty(ApiSecret)) throw new ArgumentException("ApiSecret cannot be blank.");
-
-            if (!ValidKey.IsMatch(key)) throw new ArgumentException("ApiKey is invalid.");
-            if (!ValidSecret.IsMatch(secret)) throw new ArgumentException("ApiSecret is invalid.");
-
+            AuthorizationKey = key ?? throw new ArgumentNullException(nameof(key));
             VerifySslCert = verifySslCert;
         }
 
         #region Internals
-
-        private static string GenerateNonce()
-        {
-            var data = new byte[4];
-            lock (RNG)
-            {
-                RNG.GetBytes(data);
-            }
-
-            var l = BitConverter.ToUInt32(data);
-            return l.ToString("x8");
-        }
-
-        private string GenerateAuth()
-        {
-            var dt         = DateTime.Now.ToUniversalTime().ToString("yyyyMMdd'Z'HHmmss");
-            var nonce      = GenerateNonce();
-            var data       = Encoding.ASCII.GetBytes($"{ApiSecret}{dt}{nonce}");
-            var hashBytes  = SHA.ComputeHash(data);
-            var hashString = string.Join("", hashBytes.Select(x => x.ToString("x2")));
-            return $"{ApiKey}:{dt}:{nonce}:{hashString}";
-        }
 
         private static bool AcceptAnyCert(
             object          sender,
@@ -178,7 +79,7 @@ namespace PfSenseFauxApi.Net
             }
 
             ret.Method = method;
-            ret.Headers.Add("fauxapi-auth", GenerateAuth());
+            ret.Headers.Add("fauxapi-auth", AuthorizationKey.GenerateToken());
             ret.Headers.Add("Accept", "application/json");
 
             return ret;
@@ -215,6 +116,12 @@ namespace PfSenseFauxApi.Net
             }
 
             var response     = (HttpWebResponse) await request.GetResponseAsync();
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                throw new ApiMissingActionException(endpoint);
+            }
+            
             var responseBody = await GetResponseBody(response);
 
             if (response.StatusCode != expectedStatusCode)

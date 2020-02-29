@@ -6,7 +6,7 @@
 
         public ConfigGet_Should()
         {
-            _dev = TestConfig.Instance.GetDevice();
+            _dev = new TestConfig().GetDevice();
         }
         
         

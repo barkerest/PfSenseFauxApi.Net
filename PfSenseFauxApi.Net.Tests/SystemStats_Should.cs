@@ -14,7 +14,7 @@ namespace PfSenseFauxApi.Net.Tests
         public SystemStats_Should(ITestOutputHelper output)
         {
             _output = output ?? throw new ArgumentNullException();
-            _dev = TestConfig.Instance.GetDevice();
+            _dev = new TestConfig().GetDevice();
         }
 
         [Fact]
