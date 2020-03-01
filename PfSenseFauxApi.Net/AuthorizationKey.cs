@@ -11,15 +11,18 @@ namespace PfSenseFauxApi.Net
     /// </summary>
     public class AuthorizationKey
     {
+        private static readonly string ValidKeyPattern    = @"^PFFA(?!example0[12])[A-Za-z0-9]{8,36}$";
+        private static readonly string ValidSecretPattern = @"^[A-Za-z0-9]{40,128}$";
+
         /// <summary>
         /// Alphanumeric, 12-40 chars, start with PFFA, not be PFFAexample01 or PFFAexample02.
         /// </summary>
-        public static readonly Regex ValidKey = new Regex(@"^PFFA(?!example0[12])[A-Za-z0-9]{8,36}$");
+        public static readonly Regex ValidKey = new Regex(ValidKeyPattern);
 
         /// <summary>
         /// Alphanumeric, 40-128 chars.
         /// </summary>
-        public static readonly Regex ValidSecret = new Regex(@"^[A-Za-z0-9]{40,128}$");
+        public static readonly Regex ValidSecret = new Regex(ValidSecretPattern);
 
         private static readonly char[] AlphaNum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".ToCharArray();
 
@@ -58,8 +61,8 @@ namespace PfSenseFauxApi.Net
 
             if (string.IsNullOrEmpty(Key)) throw new ArgumentException("cannot be blank", nameof(key));
             if (string.IsNullOrEmpty(Secret)) throw new ArgumentException("cannot be blank", nameof(secret));
-            if (!ValidKey.IsMatch(Key)) throw new ArgumentException("is not valid", nameof(key));
-            if (!ValidSecret.IsMatch(Secret)) throw new ArgumentException("is not valid", nameof(secret));
+            if (!Regex.IsMatch(Key, ValidKeyPattern)) throw new ArgumentException("is not valid", nameof(key));
+            if (!Regex.IsMatch(Secret, ValidSecretPattern)) throw new ArgumentException("is not valid", nameof(secret));
         }
 
         /// <summary>
@@ -103,8 +106,8 @@ namespace PfSenseFauxApi.Net
                 var secret = sb.ToString();
 
                 // theoretically possible, but highly unlikely.
-                if (!ValidKey.IsMatch(key) ||
-                    !ValidSecret.IsMatch(secret)) continue;
+                if (!Regex.IsMatch(key, ValidKeyPattern) ||
+                    !Regex.IsMatch(secret, ValidSecretPattern)) continue;
 
                 Key    = key;
                 Secret = secret;
@@ -112,7 +115,7 @@ namespace PfSenseFauxApi.Net
             }
         }
 
-        private static uint RandomUInt32()
+        private uint RandomUInt32()
         {
             var b = new byte[4];
 

@@ -6,7 +6,7 @@ namespace PfSenseFauxApi.Net.ResponseData
     public class AliasUpdateUrlTablesResponse
     {
         [JsonPropertyName("updates")]
-        public Dictionary<string,UrlTableUpdateStatus> Updates { get; set; }
+        public AliasUpdateUrlTableEntry[] Updates { get; set; }
     }
     
     

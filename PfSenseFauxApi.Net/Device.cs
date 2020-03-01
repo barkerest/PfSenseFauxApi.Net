@@ -33,12 +33,34 @@ namespace PfSenseFauxApi.Net
         /// </summary>
         public bool VerifySslCert { get; }
 
+        /// <summary>
+        /// Gets the version of the API.
+        /// </summary>
+        public Version ApiVersion { get; }
+        
         public Device(string path, AuthorizationKey key, bool verifySslCert)
         {
             Path = path ?? throw new ArgumentNullException(nameof(path));
             if (string.IsNullOrEmpty(Path)) throw new ArgumentException("Path cannot be blank.");
             AuthorizationKey = key ?? throw new ArgumentNullException(nameof(key));
             VerifySslCert = verifySslCert;
+
+            try
+            {
+                var data = StandardCall<ApiVersionResponse>("api_version").Result;
+                var ver = data.Version.Replace("_", ".0.");
+                ApiVersion = Version.Parse(ver);
+            }
+            catch (ApiMissingActionException)
+            {
+                ApiVersion = new Version(0, 0, 0, 0);
+            }
+
+            if (ApiVersion.Major != 1 &&
+                ApiVersion.Minor < 30)
+            {
+                throw new ApiException("The device is not running a compatible API version.");
+            }
         }
 
         #region Internals
