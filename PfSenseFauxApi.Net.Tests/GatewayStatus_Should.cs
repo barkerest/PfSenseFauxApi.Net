@@ -8,13 +8,13 @@ namespace PfSenseFauxApi.Net.Tests
 {
     public class GatewayStatus_Should
     {
-        private readonly Device _dev;
+        private readonly ApiContext _dev;
         private readonly ITestOutputHelper _output;
 
         public GatewayStatus_Should(ITestOutputHelper output)
         {
             _output = output ?? throw new ArgumentNullException();
-            _dev = new TestConfig().GetDevice();
+            _dev = new TestConfig().GetApiContext();
         }
 
         [Fact]

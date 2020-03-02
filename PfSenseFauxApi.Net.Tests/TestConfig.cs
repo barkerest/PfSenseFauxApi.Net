@@ -13,10 +13,10 @@ namespace PfSenseFauxApi.Net.Tests
         
         public string Path => $"https://{Host}/fauxapi/v1/";
 
-        public Device GetDevice()
+        public ApiContext GetApiContext()
         {
             var a = new AuthorizationKey(Key, Secret);
-            return new Device(Path, a, false);
+            return new ApiContext(Path, a, false);
         }
         
         private static string ConfigPath([CallerFilePath] string sourceFilePath = "")

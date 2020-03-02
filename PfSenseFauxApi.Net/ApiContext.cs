@@ -4,9 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Security;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -16,10 +14,13 @@ using PfSenseFauxApi.Net.ResponseData;
 
 namespace PfSenseFauxApi.Net
 {
-    public class Device
+    /// <summary>
+    /// The API context definition.
+    /// </summary>
+    public class ApiContext
     {
         /// <summary>
-        /// Path to the fauxapi.
+        /// Path to the API.
         /// </summary>
         public string Path { get; }
 
@@ -34,11 +35,22 @@ namespace PfSenseFauxApi.Net
         public bool VerifySslCert { get; }
 
         /// <summary>
-        /// Gets the version of the API.
+        /// Gets the version of the API.  Major, minor, and release come from the API.  Build is always zero.
         /// </summary>
         public Version ApiVersion { get; }
+
         
-        public Device(string path, AuthorizationKey key, bool verifySslCert)
+        private static readonly string VersionPattern = @"^(?<M>\d+)\.(?<N>\d+)\.f38(?:_(?<R>\d+))?$";
+        
+        /// <summary>
+        /// Constructs a new API context.
+        /// </summary>
+        /// <param name="path">The path to the API (eg - "https://my.device/fauxapi/v1")</param>
+        /// <param name="key">The authorization key.</param>
+        /// <param name="verifySslCert">Should we verify the device's SSL certificate.</param>
+        /// <exception cref="ArgumentException"></exception>
+        /// <exception cref="ApiException"></exception>
+        public ApiContext(string path, AuthorizationKey key, bool verifySslCert)
         {
             Path = path ?? throw new ArgumentNullException(nameof(path));
             if (string.IsNullOrEmpty(Path)) throw new ArgumentException("Path cannot be blank.");
@@ -47,19 +59,26 @@ namespace PfSenseFauxApi.Net
 
             try
             {
-                var data = StandardCall<ApiVersionResponse>("api_version").Result;
-                var ver = data.Version.Replace("_", ".0.");
-                ApiVersion = Version.Parse(ver);
+                var data  = StandardCall<ApiVersionResponse>("api_version").Result;
+                var match = Regex.Match(data.Version, VersionPattern, RegexOptions.IgnoreCase);
+
+                if (!match.Success)
+                {
+                    throw new ApiException($"The device does not appear to be running the F38 API fork ({data.Version}).");
+                }
+
+                var m = int.Parse(match.Groups["M"].Value);
+                var n = int.Parse(match.Groups["N"].Value);
+                var r = 0;
+                if (match.Groups.ContainsKey("R"))
+                {
+                    int.TryParse(match.Groups["R"].Value, out r);
+                }
+                ApiVersion = new Version(m, n, 0, r);
             }
             catch (ApiMissingActionException)
             {
                 ApiVersion = new Version(0, 0, 0, 0);
-            }
-
-            if (ApiVersion.Major != 1 &&
-                ApiVersion.Minor < 30)
-            {
-                throw new ApiException("The device is not running a compatible API version.");
             }
         }
 
